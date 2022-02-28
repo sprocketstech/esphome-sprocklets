@@ -1,0 +1,87 @@
+esphome:
+  name: led5v-example
+  platform: ESP8266
+  board: esp12e
+  libraries:
+    - https://github.com/sprocketstech/sprocklet_sdk.git#develop
+    - "Wire"
+
+debug:
+logger:
+  level: DEBUG
+
+external_components:
+  - source: components
+
+# Declare the mainboard
+# It is important to declare the children in the proper order so that
+# addressing works correctly
+sprocklet:
+  id: mainboard
+  children:
+    - l1
+    - l2
+
+# To expose the switch to Home assistant, set the name property
+# otherwise the switch will be private.  The LED is configured as
+# an ESPHome float output, so create a light (monochromatic) pointing
+# to the id as shown at the bottom of this file.
+#
+sprocklet_led5v:
+  ## Momentary switches can detect long, very long, double, and triple presses
+  ## each has an associated on_* automation
+  - id: l1
+    controller_id: mainboard
+    name: switch1
+    switch_type: momentary
+    effect: breathe
+    detect_long_press: true
+    detect_very_long_press: true
+    detect_double_press: true
+    detect_triple_press: true
+    on_press:
+      then:
+        - light.toggle:
+            id: kitchen_light
+    on_double_press:
+      then:
+        - sprocklet_led5v.set_effect:
+            id: l1
+            effect: candle
+    on_triple_press:
+      then:
+        - sprocklet_led5v.set_effect:
+            id: l1
+            effect: breathe
+    on_long_press:
+      then:
+        - sprocklet_led5v.set_effect:
+            id: l1
+            effect: fast blink
+    on_very_long_press:
+      then:
+        - sprocklet_led5v.set_effect:
+            id: l1
+            effect: slow blink
+  ## Toggle switches can detect on or off
+  ## each has an associated when_* automation
+  - id: l2
+    switch_type: toggle
+    controller_id: mainboard
+    effect: candle
+    when_on:
+      then:
+        - light.turn_on:
+            id: kitchen_light
+    when_off:
+      then:
+        - light.turn_off:
+            id: kitchen_light
+
+light:
+  - platform: monochromatic
+    name: "Kitchen Lights"
+    id: kitchen_light
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+    output: l2

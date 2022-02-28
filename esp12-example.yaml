@@ -1,0 +1,23 @@
+esphome:
+  name: esp12-example
+  platform: ESP8266
+  board: esp12e
+  libraries:
+    - https://github.com/sprocketstech/sprocklet_sdk.git#develop
+    - "Wire"
+
+debug:
+logger:
+  level: DEBUG
+
+external_components:
+  - source: components
+
+sprocklet:
+  id: mainboard
+  children:
+    - l1
+
+sprocklet_led5v:
+  - id: l1
+    controller_id: mainboard
