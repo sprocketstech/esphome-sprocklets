@@ -2,77 +2,54 @@
 
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
-#include "esphome/components/binary_sensor/binary_sensor.h"
-#include "esphome/components/output/float_output.h"
-#include <Sprocklets.h>
+#include "esphome/components/sprocklet_switch/SprockletSwitch.h"
+#include "esphome/components/sprocklet/Sprocklet.h"
+#include "esphome/components/light/light_output.h"
+#include "esphome/components/sprocklet/DirtyValue.h"
+
+#include <sprocklets/D-LED-5V.h>
 
 namespace esphome
 {
 	namespace sprocklet
 	{
-		class SprockletLED5V : public binary_sensor::BinarySensor,
-							   public output::FloatOutput,
-							   public PollingComponent,
-							   public Sprocklet
+		namespace led5v
 		{
-		public:
-			SprockletLED5V(const char *id, DLED5V_SWITCH_TYPE switchType) : PollingComponent(1000),
-																			Sprocklet(id)
-
+			class SprockletLED5V : public light::LightOutput,
+								public Component,
+								public Sprocklet
 			{
-				_switchConfig = DLED5V_SWITCH_DETECT_NONE;
-				_lastState = DLED5V_SWITCH_OFF;
-				_switchType = switchType;
-			}
+			public:
+				SprockletLED5V(const char *id, int position);
 
-			void write_state(float val) override;
+				uint16_t deviceId() { return DLED5V_DEVICE_ID; }
 
-			void setup() override;
-			void update() override;
-			void dump_config() override;
+				light::LightTraits get_traits() override;
+				void setup_state(light::LightState *state) override;
+				void write_state(light::LightState *state) override;
 
-			void setEffect(DLED5V_EFFECTS effect);
-			void detectLong(bool detect);
-			void detectVeryLong(bool detect);
-			void detectDouble(bool detect);
-			void detectTriple(bool detect);
+				void setEffect(DLED5V_EFFECTS effect);
+				void setAction(DLED5V_SW_ACTION action);
 
-			uint16_t deviceId() override { return DLED5V_DEVICE_ID; }
+				void setSwitch(switches::SprockletSwitch *sw);
+			protected:
+				void onAddressProgrammed(uint8_t address) override;
 
-			void addWhenOnCallback(std::function<void()> &&callback) { this->_whenOnCallbacks.add(std::move(callback)); }
-			void addWhenOffCallback(std::function<void()> &&callback) { this->_whenOffCallbacks.add(std::move(callback)); }
+			private:
+				void publishStates();
+				void publishEffect();
+				void publishBrightness();
+				void publishAction();
 
-			void addOnPressCallback(std::function<void()> &&callback) { this->_onPressCallbacks.add(std::move(callback)); }
-			void addOnDoublePressCallback(std::function<void()> &&callback) { this->_onDoublePressCallbacks.add(std::move(callback)); }
-			void addOnTriplePressCallback(std::function<void()> &&callback) { this->_onTriplePressCallbacks.add(std::move(callback)); }
-			void addOnLongPressCallback(std::function<void()> &&callback) { this->_onLongPressCallbacks.add(std::move(callback)); }
-			void addOnVeryLongPressCallback(std::function<void()> &&callback) { this->_onVeryLongPressCallbacks.add(std::move(callback)); }
+  				light::LightState *				_state{nullptr};
+				switches::SprockletSwitch *		_switch{nullptr};
 
-		private:
-			void publishEffect();
-			void publishConfig();
-			void publishBrightness();
-
-			DLED5V_SWITCH_STATE _lastState;
-
-			uint32_t _brightness;
-			bool _brightnessDirty = false;
-
-			DLED5V_SWITCH_TYPE _switchType;
-			DLED5V_EFFECTS _effect = DLED5V_EFFECT_STATIC;
-			bool _effectDirty = false;
-			uint8_t _switchConfig;
-			bool _configDirty = false;
-			uint32_t min_value = 0;
-			uint32_t max_value = 255;
-
-			CallbackManager<void()> _whenOnCallbacks{};
-			CallbackManager<void()> _whenOffCallbacks{};
-			CallbackManager<void()> _onPressCallbacks{};
-			CallbackManager<void()> _onDoublePressCallbacks{};
-			CallbackManager<void()> _onTriplePressCallbacks{};
-			CallbackManager<void()> _onLongPressCallbacks{};
-			CallbackManager<void()> _onVeryLongPressCallbacks{};
-		};
+				DirtyValue<uint32_t> 			_brightness{255};
+				DirtyValue<DLED5V_EFFECTS> 		_effect{DLED5V_EFFECT_STATIC};
+				DirtyValue<DLED5V_SW_ACTION> 	_switchAction{DLED5V_ACTION_NONE};
+				uint32_t 						min_value{0};
+				uint32_t 						max_value{255};
+			};
+		}
 	}
 }

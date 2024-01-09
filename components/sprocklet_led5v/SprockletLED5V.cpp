@@ -1,224 +1,127 @@
 #include "SprockletLED5V.h"
+#include "BuiltinEffect.h"
 #include "esphome.h"
-#include <Wire.h>
+
 namespace esphome
 {
     namespace sprocklet
     {
-        void SprockletLED5V::setup()
+        namespace led5v
         {
-            ESP_LOGD("SprockletLED5VLight", "Switch type %d", _switchType);
-            Wire.beginTransmission(address());
-            Wire.write(DLED5V_SW_TYPE_REGISTER);
-            Wire.write((uint8_t)_switchType);
-            Wire.endTransmission();
-            delay(1);
-            update();
-        }
-
-        void SprockletLED5V::update()
-        {
-            DLED5V_SWITCH_STATE state = _lastState;
-            // read the state
-            Wire.beginTransmission(address());
-            // start reading at the state register
-            Wire.write(DLED5V_SW_STATE_REGISTER);
-            Wire.endTransmission(false);
-            Wire.requestFrom(address(), (uint8_t)1, true);
-            if (Wire.available() >= 1)
+            SprockletLED5V::SprockletLED5V(const char *id, int position) :
+                Sprocklet(id, position)
             {
-                state = (DLED5V_SWITCH_STATE)Wire.read();
             }
-            Wire.endTransmission();
-            delay(1);
 
-            auto on = state == DLED5V_SWITCH_ON ||
-                      state == DLED5V_SWITCH_PRESS ||
-                      state == DLED5V_SWITCH_LONG_PRESS ||
-                      state == DLED5V_SWITCH_VERY_LONG_PRESS ||
-                      state == DLED5V_SWITCH_DOUBLE_PRESS ||
-                      state == DLED5V_SWITCH_TRIPLE_PRESS;
-            publish_state(on);
-
-            if (_lastState != state)
+            void SprockletLED5V::setup_state(light::LightState *state)
             {
-                ESP_LOGD("SprockletLED5V", "Got state %d from address %d", state, address());
-                switch (state)
+                if (failed())
                 {
-                case DLED5V_SWITCH_PRESS:
-                    _onPressCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_LONG_PRESS:
-                    _onLongPressCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_VERY_LONG_PRESS:
-                    _onVeryLongPressCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_DOUBLE_PRESS:
-                    _onDoublePressCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_TRIPLE_PRESS:
-                    _onTriplePressCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_ON:
-                    _whenOnCallbacks.call();
-                    break;
-                case DLED5V_SWITCH_OFF:
-                    _whenOffCallbacks.call();
-                    break;
+                    state->mark_failed();
                 }
-                _lastState = state;
+                
+                this->_state = state;
+                std::vector<light::LightEffect *> namedEffects =
+                {
+                    new BuiltinEffect("static", [this]() { this->setEffect(DLED5V_EFFECT_STATIC); }),
+                    new BuiltinEffect("slow blink", [this]() { this->setEffect(DLED5V_EFFECT_SLOW_BLINK); }),
+                    new BuiltinEffect("fast blink", [this]() { this->setEffect(DLED5V_EFFECT_FAST_BLINK); }),
+                    new BuiltinEffect("breathe", [this]() { this->setEffect(DLED5V_EFFECT_BREATHE); }),
+                    new BuiltinEffect("candle", [this]() { this->setEffect(DLED5V_EFFECT_CANDLE); }),
+                    new BuiltinEffect("sparkle", [this]() { this->setEffect(DLED5V_EFFECT_SPARKLE); })
+                };
+                this->_state->add_effects(namedEffects);
             }
 
-            if (_effectDirty)
+            light::LightTraits SprockletLED5V::get_traits()
             {
-                publishEffect();
+                auto traits = light::LightTraits();
+                traits.set_supported_color_modes({light::ColorMode::BRIGHTNESS});
+                return traits;
             }
-            if (_configDirty)
+							
+            void SprockletLED5V::write_state(light::LightState *state)
             {
-                publishConfig();
-            }
-            if (_brightnessDirty)
-            {
+                float brightness;
+                state->current_values_as_brightness(&brightness);
+                _brightness = static_cast<uint32_t>(brightness * (float)this->max_value);
+                _brightness = std::max(_brightness.value(), this->min_value);
                 publishBrightness();
             }
-        }
-
-        void SprockletLED5V::dump_config()
-        {
-        }
-
-        void SprockletLED5V::write_state(float bright)
-        {
-            _brightness = static_cast<uint32_t>(bright * this->max_value);
-            _brightness = std::max(_brightness, this->min_value);
-            publishBrightness();
-        }
-
-        void SprockletLED5V::setEffect(DLED5V_EFFECTS effect)
-        {
-            _effect = effect;
-            publishEffect();
-        }
-
-        void SprockletLED5V::detectLong(bool detect)
-        {
-            if (detect)
+            
+            void SprockletLED5V::setSwitch(switches::SprockletSwitch *sw)
             {
-                _switchConfig |= DLED5V_SWITCH_DETECT_LONG;
+                _switch = sw;
+                _switch->configure(address(),
+                                    DLED5V_SWITCH_TYPE_REGISTER,
+                                    DLED5V_SWITCH_AGE_REGISTER,
+                                    DLED5V_SWITCH_TOGGLE_STATE_REGISTER,
+                                    DLED5V_SWITCH_MOMENTARY_CLICK_COUNT_REGISTER,
+                                    DLED5V_SWITCH_MOMENTARY_PRESS_DURATION_REGISTER);
             }
-            else
-            {
-                _switchConfig &= ~DLED5V_SWITCH_DETECT_LONG;
-            }
-            publishConfig();
-        }
 
-        void SprockletLED5V::detectVeryLong(bool detect)
-        {
-            if (detect)
-            {
-                _switchConfig |= DLED5V_SWITCH_DETECT_VERYLONG;
-            }
-            else
-            {
-                _switchConfig &= ~DLED5V_SWITCH_DETECT_VERYLONG;
-            }
-            publishConfig();
-        }
 
-        void SprockletLED5V::detectDouble(bool detect)
-        {
-            if (detect)
+            void SprockletLED5V::publishStates()
             {
-                _switchConfig |= DLED5V_SWITCH_DETECT_DOUBLE_PRESS;
+                publishEffect();
+                publishBrightness();
+                publishAction();
             }
-            else
-            {
-                _switchConfig &= ~DLED5V_SWITCH_DETECT_DOUBLE_PRESS;
-            }
-            publishConfig();
-        }
 
-        void SprockletLED5V::detectTriple(bool detect)
-        {
-            if (detect)
+            void SprockletLED5V::setEffect(DLED5V_EFFECTS effect)
             {
-                _switchConfig |= DLED5V_SWITCH_DETECT_TRIPLE_PRESS;
+                _effect = effect;
+                publishEffect();
             }
-            else
+
+            void SprockletLED5V::setAction(DLED5V_SW_ACTION action)
             {
-                _switchConfig &= ~DLED5V_SWITCH_DETECT_TRIPLE_PRESS;
+                _switchAction = action;
+                publishAction();
             }
-            publishConfig();
-        }
 
-        void SprockletLED5V::publishBrightness()
-        {
-
-            if (address() != SPROCKET_UNADDRESSED)
+            void SprockletLED5V::publishBrightness()
             {
-                ESP_LOGD("SprockletLED5VLight", "Brightness %d to %d", _brightness, address());
-                // set the brightness
-                Wire.beginTransmission(address());
-                Wire.write(DLED5V_LED_BRIGHTNESS_REGISTER);
-                Wire.write((uint8_t)_brightness);
-                auto error = Wire.endTransmission();
-                ESP_LOGD("SprockletLED5VLight", "Brightness error %d from %d", error, address());
-                delay(1);
-                if (error == 0)
+                if (address() != SPROCKET_UNADDRESSED && _brightness.dirty())
                 {
-                    _brightnessDirty = false;
-                }
-                else
-                {
-                    _brightnessDirty = true;
+                    ESP_LOGD("SprockletLED5VLight", "Brightness %d to %d", _brightness.value(), address());
+                    Bus::write8(address(), DLED5V_LED_BRIGHTNESS_REGISTER, (uint8_t)_brightness.value());
+                    _brightness.clean();
                 }
             }
-            else
+
+            void SprockletLED5V::publishEffect()
             {
-                // flag for update loop
-                _brightnessDirty = true;
+                if (address() != SPROCKET_UNADDRESSED && _effect.dirty())
+                {
+                    ESP_LOGD("SprockletLED5VLight", "Effect %d to %d", _effect.value(), address());
+                    Bus::write8(address(), DLED5V_LED_EFFECT_REGISTER, (uint8_t)_effect.value());
+                    _effect.clean();
+                }
+            }
+
+            void SprockletLED5V::publishAction()
+            {
+                if (address() != SPROCKET_UNADDRESSED && _switchAction.dirty())
+                {
+                    ESP_LOGD("SprockletLED5VLight", "Action %d to %d", _switchAction.value(), address());
+                    Bus::write8(address(), DLED5V_SWITCH_ACTION_REGISTER, (uint8_t)_switchAction.value());
+                    _switchAction.clean();
+                }
+            }
+            
+            void SprockletLED5V::onAddressProgrammed(uint8_t address)
+            {
+                if (_switch != nullptr)
+                {
+                    _switch->configure(address,
+                                        DLED5V_SWITCH_TYPE_REGISTER,
+                                        DLED5V_SWITCH_AGE_REGISTER,
+                                        DLED5V_SWITCH_TOGGLE_STATE_REGISTER,
+                                        DLED5V_SWITCH_MOMENTARY_CLICK_COUNT_REGISTER,
+                                        DLED5V_SWITCH_MOMENTARY_PRESS_DURATION_REGISTER);
+                }
             }
         }
-
-        void SprockletLED5V::publishEffect()
-        {
-            if (address() != SPROCKET_UNADDRESSED)
-            {
-                ESP_LOGD("SprockletLED5VLight", "Effect %d to %d", _effect, address());
-                Wire.beginTransmission(address());
-                Wire.write(DLED5V_LED_EFFECT_REGISTER);
-                Wire.write((uint8_t)_effect);
-                Wire.endTransmission();
-                delay(1);
-                _effectDirty = false;
-            }
-            else
-            {
-                // flag for update loop
-                _effectDirty = true;
-            }
-        }
-
-        void SprockletLED5V::publishConfig()
-        {
-            if (address() != SPROCKET_UNADDRESSED)
-            {
-                ESP_LOGD("SprockletLED5VLight", "Detect Config %d on %d", _switchConfig, address());
-                Wire.beginTransmission(address());
-                Wire.write(DLED5V_SW_DETECT_REGISTER);
-                Wire.write((uint8_t)_switchConfig);
-                Wire.endTransmission();
-                delay(1);
-                _configDirty = false;
-            }
-            else
-            {
-                // flag for update loop
-                _configDirty = true;
-            }
-        }
-
     }
 }

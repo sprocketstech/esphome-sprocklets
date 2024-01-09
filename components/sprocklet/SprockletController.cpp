@@ -1,10 +1,22 @@
 #include "SprockletController.h"
+#include "C_ESP12.h"
 
+#include <algorithm>
 namespace esphome
 {
 	namespace sprocklet
 	{
 		static const char *const TAG = "sprocklet_esp12";
+
+		SprockletController::SprockletController(SprockletBoardType boardType)
+		{
+			switch (boardType)
+			{
+				default:
+					_board = new SprockletESP12Board();
+					break;
+			}
+		}
 
 		void debuglog(const char *msg)
 		{
@@ -13,20 +25,13 @@ namespace esphome
 
 		void SprockletController::setup()
 		{
-			// build a vector of sprocklets in the proper order
-			// based on the childids
-			std::vector<Sprocklet *> sprocklets;
-			for (auto it = _childIds.begin(); it != _childIds.end(); ++it)
+			// sort the vector of sprocklets in the order specified
+			std::sort(_sprocklets.begin(), _sprocklets.end(), [](const Sprocklet * a, const Sprocklet * b)
 			{
-				std::string searchId = *it;
-				auto sp = std::find_if(_sprocklets.begin(), _sprocklets.end(), [&searchId](const Sprocklet *obj)
-									   { return obj->id() == searchId; });
-				if (sp != _sprocklets.end())
-				{
-					sprocklets.push_back(*sp);
-				}
-			}
-			_board.programAddresses(debuglog, sprocklets);
+				return a->position() < b->position(); 
+			});
+
+			_board->programAddresses(debuglog, _sprocklets);
 		}
 
 		void SprockletController::loop()
