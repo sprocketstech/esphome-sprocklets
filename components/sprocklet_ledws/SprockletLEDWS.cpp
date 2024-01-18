@@ -28,6 +28,10 @@ namespace esphome
                     writer.end();
                     this->mark_shown_();
                 }
+                else
+                {
+                    this->schedule_show();
+                }
             }
 
             void SprockletLEDWS::clear_effect_data()
@@ -125,6 +129,8 @@ namespace esphome
                                         DLEDWS_SWITCH_MOMENTARY_CLICK_COUNT_REGISTER,
                                         DLEDWS_SWITCH_MOMENTARY_PRESS_DURATION_REGISTER);
                 }
+                publishNumLeds();
+                publishAction();
             }
         }
     }

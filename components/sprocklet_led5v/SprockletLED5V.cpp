@@ -46,7 +46,7 @@ namespace esphome
                 state->current_values_as_brightness(&brightness);
                 _brightness = static_cast<uint32_t>(brightness * (float)this->max_value);
                 _brightness = std::max(_brightness.value(), this->min_value);
-                publishBrightness();
+                publishStates();
             }
             
             void SprockletLED5V::setSwitch(switches::SprockletSwitch *sw)
@@ -121,6 +121,7 @@ namespace esphome
                                         DLED5V_SWITCH_MOMENTARY_CLICK_COUNT_REGISTER,
                                         DLED5V_SWITCH_MOMENTARY_PRESS_DURATION_REGISTER);
                 }
+                publishStates();
             }
         }
     }
