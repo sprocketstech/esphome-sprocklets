@@ -1,5 +1,5 @@
 esphome:
-  name: led5v-example
+  name: ledws-example
   platform: ESP8266
   board: esp12e
 
@@ -17,13 +17,14 @@ sprocklet:
 
 # It is important to set the correct "position" for the children -- it should be in the order they are plugged in 
 # so that addressing works correctly
-sprocklet_led5v:
+sprocklet_ledws:
   - id: l1
-    name: "Test Light"
+    name: "Test Light 1"
     position: 1
     controller_id: mainboard
-    effect: breathe
     switch_action: none
+    num_leds: 8
+    # any addressable light properties can follow (effects, etc)                            
     # To expose the switch to Home assistant, set the name property on the switch as shown here, if not set the switch will be private    
     switch:
       name: "Test Light Switch"
@@ -37,27 +38,3 @@ sprocklet_led5v:
       # in HA with the current press duration of the switch
       press_duration:
         name: Test Light Switch Press Duration
-      on_press:
-        then:
-          - light.toggle:
-              id: l1
-      on_double_press:
-        then:
-          - light.turn_on:
-              id: l1
-              effect: candle
-      on_triple_press:
-        then:
-          - light.turn_on:
-              id: l1
-              effect: breathe
-      on_long_press:
-        then:
-          - light.turn_on:
-              id: l1
-              effect: fast blink
-      on_very_long_press:
-        then:
-          - light.turn_on:
-              id: l1
-              effect: slow blink       
