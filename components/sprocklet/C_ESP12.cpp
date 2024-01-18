@@ -83,6 +83,7 @@ namespace esphome
         void SprockletESP12Board::waitForReady(programAddressesLogCallback cb, uint8_t addr)
         {
             bool done = false;
+            uint32_t testCount = 0;
             while (!done)
             {
                 // query the address which is in register SPROCKLET_PROGRAM_COMMAND
@@ -96,6 +97,10 @@ namespace esphome
                 if (reportedAddr != addr)
                 {
                     delay(5);
+                    if (++testCount > 10)
+                    {
+                        done = true;
+                    }
                 }
                 else
                 {
